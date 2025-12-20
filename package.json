@@ -1,6 +1,6 @@
 {
 	"name": "@kartikcs/auth-ui",
-	"version": "1.0.0",
+	"version": "0.0.1-alpha",
 	"description": "Next.js 16 UI package for authentication with auth-server integration",
 	"homepage": "https://github.com/thisiskartik/auth-ui#readme",
 	"bugs": {
