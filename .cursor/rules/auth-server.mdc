@@ -1,0 +1,60 @@
+---
+alwaysApply: true
+---
+
+This is a library for integrating auth-server into other NextJS frontend applications.
+
+It will read the following info from an environment varaible
+NEXT_PUBLIC_CLIENT_ID="..."
+CLIENT_SECRET="..."
+NEXT_PUBLIC_AUTH_SERVER_ENDPOINT="" // Base URL of the auth server
+
+The behaviour required for integrating app is this:
+
+1. Just after the app starts before any request comes to the app it should send request to /client/me with Basic Auth (Client ID and Client Secret) in response this will return public_key in the body which can be used to validate jwt access tokens (algorithm used RS256)
+
+2. In the middleware write some thing that the integrating app should be able to list protected and non protected routes. The login route will always be /login and sign up will be /sign-up. If required create a AuthProvider for implementing this functionality.
+
+3. Create a Login Component
+   3.1 POST /login (to auth server) Body requires: client_id, code_challenge, email, password and it will return "code". In case the login credentials are wrong it will return 401 with error "Invalid credentials"
+   3.2 POST /oauth/token (to auth server) required Basic Auth (client_id, client_secret), body requires "code", and code_verifier. This will happen through some server action and it will return refresh_token and access_token
+   3.3 access_token can be stored in some local storage or some state on the frontend, but refresh_token should be stored in http only cookie.
+   3.4 A GET /user/me (to auth server), Authorization: Bearer <access_token> This will return information of the user like first_name, last_name, email, is_verified. If the user is not verfied they should be sent to the /verify page which will show ask them to enter verification code (refer point 4 later)
+
+4. Create a Register Component
+   4.1 POST /user/register (to auth server) Body requires: first_name, last_name, email (should be valid), password (min len: 8, one uppercase letter, one lowercase letter, one number, one special character (non alpha numeric).
+   4.2 In case there is input validation error it will send 400 error something like this
+   {
+   "error": "Validation Failed",
+   "fields": {
+   "email": "Invalid email",
+   "password": [
+   "min lenght should be 8",
+   "must contain a number"
+   ],
+   "first_name": "field is required"
+   }
+   }
+   Otherwise will return 201 status code
+   4.3 After registration the user should be sent to a /verify page (can be a component in library which the integrating app should add) where they should enter a 6 digit verifidation code that is sent to their email
+   4.4 POST /user/verify (to auth server) body requres: email, code (string)
+   4.5 On this /verify page they should also have an option to resend verification code
+   4.6 POST /user/verify/resend (to auth server), Body requires email
+
+5. On the login page/component there should an option to /forgot-password (page or component) where they can enter their email and request for a password reset link
+   5.1 POST /user/password/forgot (to auth server) Body requires email
+   5.2 The reset link will send the user to /reset-password (page or component in libarary), this link will have query parameter ?code=<some code> this code should be present to access this page
+   5.3 POST /user/password/reset (to auth server) Body requires "code", and "new_password" (again should match the constraints mentioned in registration)
+   5.4 In case the code is wrong it will send 400 error
+
+6. There must a logout button component
+   6.1 POST /logout (to auth server), Body requires "refresh_token"
+   6.2 Now since the refresh token is stored in http only cookie it should be a server action which forwards this refresh token to he auth server
+   6.3 Should also remove the access token from the frontend
+
+7. Create a function (should take in base url) to create an axios object in the libarary such that whenever we get 401 response from the server with error "Invalid access_token" It should
+   7.1 POST /oauth/refresh (to auth server), Body requires "refresh_token", Now since refresh_token is stored in http only cookie you need to either create a server action or a NextJS api route (figure out the implementation) If this response is success (200) with new access token then retry the previous request else logout the user, clear the refresh token cookie and remove access token from the frontend
+
+8. In the library have helper functions like get user details, logout user, something like that will help the integrating application.
+
+Maintain every instruction on how to use this library in the README.md
